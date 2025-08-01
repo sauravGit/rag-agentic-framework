@@ -1,0 +1,134 @@
+version: '3.8'
+
+services:
+  # Core Framework Services
+  api-gateway:
+    build:
+      context: .
+      dockerfile: docker/api-gateway/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - VECTOR_DB_HOST=vector-db
+      - DOCUMENT_PROCESSOR_HOST=document-processor
+      - AGENT_ORCHESTRATOR_HOST=agent-orchestrator
+    volumes:
+      - ./config:/app/config
+    depends_on:
+      - vector-db
+      - document-processor
+      - agent-orchestrator
+      - compliance-service
+
+  # Vector Database Service
+  vector-db:
+    image: elasticsearch:8.8.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - vector-db-data:/usr/share/elasticsearch/data
+
+  # Vector Database Management UI
+  vector-db-ui:
+    image: kibana:8.8.0
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://vector-db:9200
+    depends_on:
+      - vector-db
+
+  # Document Processing Service
+  document-processor:
+    build:
+      context: .
+      dockerfile: docker/document-processor/Dockerfile
+    environment:
+      - VECTOR_DB_HOST=vector-db
+      - COMPLIANCE_SERVICE_HOST=compliance-service
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+    depends_on:
+      - vector-db
+      - compliance-service
+
+  # Agent Orchestration Service
+  agent-orchestrator:
+    build:
+      context: .
+      dockerfile: docker/agent-orchestrator/Dockerfile
+    environment:
+      - VECTOR_DB_HOST=vector-db
+      - EVALUATION_SERVICE_HOST=evaluation-service
+      - COST_OPTIMIZER_HOST=cost-optimizer
+    volumes:
+      - ./config:/app/config
+    depends_on:
+      - vector-db
+      - evaluation-service
+      - cost-optimizer
+
+  # Compliance Service
+  compliance-service:
+    build:
+      context: .
+      dockerfile: docker/compliance-service/Dockerfile
+    environment:
+      - DLP_ENABLED=true
+    volumes:
+      - ./config:/app/config
+
+  # Evaluation Service
+  evaluation-service:
+    build:
+      context: .
+      dockerfile: docker/evaluation-service/Dockerfile
+    environment:
+      - VECTOR_DB_HOST=vector-db
+    volumes:
+      - ./config:/app/config
+    depends_on:
+      - vector-db
+
+  # Cost Optimization Service
+  cost-optimizer:
+    build:
+      context: .
+      dockerfile: docker/cost-optimizer/Dockerfile
+    volumes:
+      - ./config:/app/config
+
+  # Web UI
+  web-ui:
+    build:
+      context: .
+      dockerfile: docker/web-ui/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - API_GATEWAY_URL=http://api-gateway:8080
+    depends_on:
+      - api-gateway
+
+  # Monitoring Service
+  monitoring:
+    build:
+      context: .
+      dockerfile: docker/monitoring/Dockerfile
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config:/app/config
+    depends_on:
+      - api-gateway
+      - vector-db
+      - document-processor
+      - agent-orchestrator
+
+volumes:
+  vector-db-data:
