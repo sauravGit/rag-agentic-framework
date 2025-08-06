@@ -1,211 +1,127 @@
-"""
-Docker Compose configuration for the Enhanced MLOps Framework for Agentic AI RAG Workflows.
-
-This file defines all services required to run the complete framework locally.
-"""
-
 version: '3.8'
 
 services:
-  # API Gateway - Entry point for all requests
   api-gateway:
     build:
       context: .
-      dockerfile: docker/api-gateway/Dockerfile
+      dockerfile: docker/api-gateway.Dockerfile
     ports:
       - "8000:8000"
     environment:
-      - CONFIG_PATH=/app/config/medical_rag_config.yaml
       - LOG_LEVEL=INFO
-      - VECTOR_DB_HOST=vector-db
-      - AGENT_ORCHESTRATOR_HOST=agent-orchestrator
-      - DOCUMENT_PROCESSOR_HOST=document-processor
-      - COMPLIANCE_SERVICE_HOST=compliance-service
-      - EVALUATION_SERVICE_HOST=evaluation-service
-      - MONITORING_SERVICE_HOST=monitoring-service
-    volumes:
-      - ./config:/app/config
+      - AGENT_ORCHESTRATOR_URL=http://agent-orchestrator:8001
+      - DOCUMENT_PROCESSOR_URL=http://document-processor:8002
+      - COMPLIANCE_URL=http://compliance-service:8003
+      - EVALUATION_URL=http://evaluation-service:8004
+      - MONITORING_URL=http://monitoring-service:8005
+      - COST_OPTIMIZER_URL=http://cost-optimizer:8006
+    networks:
+      - rag-network
     depends_on:
       - agent-orchestrator
       - document-processor
-      - vector-db
-    networks:
-      - rag-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - compliance-service
+      - evaluation-service
+      - monitoring-service
+      - cost-optimizer
 
-  # Agent Orchestrator - Manages and coordinates agents
   agent-orchestrator:
     build:
       context: .
-      dockerfile: docker/agent-orchestrator/Dockerfile
+      dockerfile: docker/agent-orchestrator.Dockerfile
     ports:
       - "8001:8001"
     environment:
-      - CONFIG_PATH=/app/config/medical_rag_config.yaml
       - LOG_LEVEL=INFO
-      - VECTOR_DB_HOST=vector-db
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json
-    volumes:
-      - ./config:/app/config
-    depends_on:
-      - vector-db
+      - VECTOR_DB_URL=http://vector-db:9200
     networks:
       - rag-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    depends_on:
+      - vector-db
 
-  # Document Processor - Handles document ingestion and processing
   document-processor:
     build:
       context: .
-      dockerfile: docker/document-processor/Dockerfile
+      dockerfile: docker/document-processor.Dockerfile
     ports:
       - "8002:8002"
     environment:
-      - CONFIG_PATH=/app/config/medical_rag_config.yaml
       - LOG_LEVEL=INFO
-      - VECTOR_DB_HOST=vector-db
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json
-    volumes:
-      - ./config:/app/config
-      - ./data:/app/data
+      - VECTOR_DB_URL=http://vector-db:9200
+    networks:
+      - rag-network
     depends_on:
       - vector-db
-    networks:
-      - rag-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
-  # Vector Database - Stores and retrieves vector embeddings
-  vector-db:
-    image: redis/redis-stack:latest
-    ports:
-      - "6379:6379"
-      - "8001:8001"
-    volumes:
-      - vector-db-data:/data
-    networks:
-      - rag-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Compliance Service - Handles compliance and governance
   compliance-service:
     build:
       context: .
-      dockerfile: docker/compliance-service/Dockerfile
+      dockerfile: docker/compliance-service.Dockerfile
     ports:
       - "8003:8003"
     environment:
-      - CONFIG_PATH=/app/config/medical_rag_config.yaml
       - LOG_LEVEL=INFO
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json
-    volumes:
-      - ./config:/app/config
     networks:
       - rag-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
-  # Evaluation Service - Handles model and response evaluation
   evaluation-service:
     build:
       context: .
-      dockerfile: docker/evaluation-service/Dockerfile
+      dockerfile: docker/evaluation-service.Dockerfile
     ports:
       - "8004:8004"
     environment:
-      - CONFIG_PATH=/app/config/medical_rag_config.yaml
       - LOG_LEVEL=INFO
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json
-    volumes:
-      - ./config:/app/config
     networks:
       - rag-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
-  # Monitoring Service - Handles metrics and monitoring
   monitoring-service:
     build:
       context: .
-      dockerfile: docker/monitoring-service/Dockerfile
+      dockerfile: docker/monitoring-service.Dockerfile
     ports:
       - "8005:8005"
-      - "9090:9090"  # Prometheus
     environment:
-      - CONFIG_PATH=/app/config/medical_rag_config.yaml
       - LOG_LEVEL=INFO
-    volumes:
-      - ./config:/app/config
-      - monitoring-data:/data
     networks:
       - rag-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
-  # Cost Optimization Service - Handles cost monitoring and optimization
   cost-optimizer:
     build:
       context: .
-      dockerfile: docker/cost-optimizer/Dockerfile
+      dockerfile: docker/cost-optimizer.Dockerfile
     ports:
       - "8006:8006"
     environment:
-      - CONFIG_PATH=/app/config/medical_rag_config.yaml
       - LOG_LEVEL=INFO
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/gcp-credentials.json
-    volumes:
-      - ./config:/app/config
     networks:
       - rag-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
-  # Web UI - React-based user interface
+  vector-db:
+    image: elasticsearch:8.8.0
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    networks:
+      - rag-network
+    volumes:
+      - vector-db-data:/usr/share/elasticsearch/data
+
   web-ui:
     build:
       context: .
-      dockerfile: docker/web-ui/Dockerfile
+      dockerfile: docker/web-ui.Dockerfile
     ports:
       - "3000:3000"
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
-      - REACT_APP_MONITORING_URL=http://localhost:8005
-    depends_on:
-      - api-gateway
+      - REACT_APP_API_URL=http://api-gateway:8000
     networks:
       - rag-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    depends_on:
+      - api-gateway
 
 networks:
   rag-network:
@@ -213,4 +129,3 @@ networks:
 
 volumes:
   vector-db-data:
-  monitoring-data:
