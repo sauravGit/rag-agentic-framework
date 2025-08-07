@@ -1,46 +1,56 @@
+import os
+from elasticsearch import Elasticsearch
 import numpy as np
 
 class VectorDBClient:
     def __init__(self):
-        self.documents = {}
-        self.vectors = {}
+        self.client = Elasticsearch(os.environ.get("ELASTICSEARCH_URL"))
 
-    def create_index(self, index_name: str):
-        # In-memory, so nothing to do here
-        pass
+    def create_index(self, index_name: str, vector_dimension: int):
+        if not self.client.indices.exists(index=index_name):
+            self.client.indices.create(
+                index=index_name,
+                body={
+                    "mappings": {
+                        "properties": {
+                            "embedding": {
+                                "type": "dense_vector",
+                                "dims": vector_dimension,
+                            },
+                            "text": {"type": "text"},
+                        }
+                    }
+                },
+            )
 
     def index_document(self, index_name: str, document_id: str, document: str, vector: np.ndarray):
-        if index_name not in self.documents:
-            self.documents[index_name] = {}
-            self.vectors[index_name] = []
-        self.documents[index_name][document_id] = document
-        self.vectors[index_name].append((document_id, vector))
-
-    def search(self, index_name: str, query_vector: np.ndarray, top_k: int = 5):
-        if index_name not in self.vectors:
-            return []
-
-        vectors = self.vectors[index_name]
-        if not vectors:
-            return []
-
-        # Unpack document IDs and their vectors
-        doc_ids, doc_vectors = zip(*vectors)
-        doc_vectors = np.array(doc_vectors)
-
-        # Calculate cosine similarity
-        similarities = np.dot(doc_vectors, query_vector) / (
-            np.linalg.norm(doc_vectors, axis=1) * np.linalg.norm(query_vector)
+        self.client.index(
+            index=index_name,
+            id=document_id,
+            body={"text": document, "embedding": vector.tolist()},
         )
 
-        # Get top_k results
-        top_k_indices = np.argsort(similarities)[-top_k:][::-1]
-
-        results = []
-        for i in top_k_indices:
-            doc_id = doc_ids[i]
-            similarity = similarities[i]
-            document = self.documents[index_name][doc_id]
-            results.append({"id": doc_id, "document": document, "score": similarity})
-
-        return results
+    def search(self, index_name: str, query_vector: np.ndarray, top_k: int = 5):
+        response = self.client.search(
+            index=index_name,
+            body={
+                "size": top_k,
+                "query": {
+                    "script_score": {
+                        "query": {"match_all": {}},
+                        "script": {
+                            "source": "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
+                            "params": {"query_vector": query_vector.tolist()},
+                        },
+                    }
+                },
+            },
+        )
+        return [
+            {
+                "id": hit["_id"],
+                "document": hit["_source"]["text"],
+                "score": hit["_score"],
+            }
+            for hit in response["hits"]["hits"]
+        ]
