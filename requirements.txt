@@ -2,3 +2,7 @@ fastapi
 uvicorn
 httpx
 python-dotenv
+numpy
+openai
+click
+pytest
