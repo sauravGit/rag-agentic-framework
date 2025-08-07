@@ -53,10 +53,41 @@ See the [Architecture Documentation](docs/architecture.md) for a more detailed d
     -   **API Gateway**: http://localhost:8000
     -   **Web UI**: http://localhost:3000
 
+## Command-Line Interface (CLI)
+
+The framework includes a command-line interface (CLI) for interacting with the MVP. You can use the CLI to:
+
+-   Index a directory of documents.
+-   Ask a question and get a response.
+-   Register and list agents.
+-   Register and list tools.
+
+To use the CLI, run the following command from the root of the repository:
+
+```bash
+python -m mvp.cli --help
+```
+
+## Software Development Kit (SDK)
+
+The framework also includes a simple Software Development Kit (SDK) for interacting with the MVP programmatically. You can use the SDK to:
+
+-   Index a directory of documents.
+-   Ask a question and get a response.
+-   Register and list agents.
+-   Register and list tools.
+
+For more information, see the `mvp/sdk.py` file.
+
+## Monitoring
+
+The framework uses Prometheus and Grafana for monitoring. You can access the Grafana dashboards at http://localhost:3001.
+
 ## Documentation
 
 - [Architecture](docs/architecture.md)
 - [Deployment Guide](docs/deployment.md)
+- [Monitoring](docs/monitoring.md)
 
 ## License
 

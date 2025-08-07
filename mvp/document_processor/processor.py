@@ -1,6 +1,11 @@
 import os
 import re
+import time
+from prometheus_client import Counter, Histogram
 from ..vector_db.client import VectorDBClient
+
+DOCUMENTS_PROCESSED = Counter("documents_processed_total", "Total number of documents processed")
+DOCUMENT_PROCESSING_TIME = Histogram("document_processing_seconds", "Time spent processing a document")
 
 class DocumentProcessor:
     def __init__(self, vector_db_client: VectorDBClient):
@@ -22,20 +27,22 @@ class DocumentProcessor:
                     self.process_document(index_name, filename, content, chunking_strategy)
 
     def process_document(self, index_name: str, document_id: str, content: str, chunking_strategy: str = 'fixed'):
-        if chunking_strategy == 'fixed':
-            chunks = self._fixed_size_chunking(content)
-        elif chunking_strategy == 'recursive':
-            chunks = self._recursive_chunking(content)
-        else:
-            raise ValueError(f"Unknown chunking strategy: {chunking_strategy}")
+        with DOCUMENT_PROCESSING_TIME.time():
+            if chunking_strategy == 'fixed':
+                chunks = self._fixed_size_chunking(content)
+            elif chunking_strategy == 'recursive':
+                chunks = self._recursive_chunking(content)
+            else:
+                raise ValueError(f"Unknown chunking strategy: {chunking_strategy}")
 
-        embedding_model = self._get_embedding_model()
-        vector_dimension = embedding_model.get_sentence_embedding_dimension()
-        self.vector_db_client.create_index(index_name, vector_dimension)
-        for i, chunk in enumerate(chunks):
-            chunk_id = f"{document_id}_chunk_{i}"
-            embedding = embedding_model.encode(chunk)
-            self.vector_db_client.index_document(index_name, chunk_id, chunk, embedding)
+            embedding_model = self._get_embedding_model()
+            vector_dimension = embedding_model.get_sentence_embedding_dimension()
+            self.vector_db_client.create_index(index_name, vector_dimension)
+            for i, chunk in enumerate(chunks):
+                chunk_id = f"{document_id}_chunk_{i}"
+                embedding = embedding_model.encode(chunk)
+                self.vector_db_client.index_document(index_name, chunk_id, chunk, embedding)
+        DOCUMENTS_PROCESSED.inc()
 
     def _fixed_size_chunking(self, content: str, chunk_size: int = 512, overlap: int = 50) -> list[str]:
         chunks = []

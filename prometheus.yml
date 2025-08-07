@@ -1,0 +1,25 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8000']
+  - job_name: 'agent-orchestrator'
+    static_configs:
+      - targets: ['agent-orchestrator:8001']
+  - job_name: 'document-processor'
+    static_configs:
+      - targets: ['document-processor:8002']
+  - job_name: 'compliance-service'
+    static_configs:
+      - targets: ['compliance-service:8003']
+  - job_name: 'evaluation-service'
+    static_configs:
+      - targets: ['evaluation-service:8004']
+  - job_name: 'monitoring-service'
+    static_configs:
+      - targets: ['monitoring-service:8005']
+  - job_name: 'cost-optimizer'
+    static_configs:
+      - targets: ['cost-optimizer:8006']

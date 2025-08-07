@@ -1,6 +1,11 @@
 import os
 import openai
+import time
+from prometheus_client import Counter, Histogram
 from ..vector_db.client import VectorDBClient
+
+QUERIES_PROCESSED = Counter("queries_processed_total", "Total number of queries processed", ["agent_name"])
+QUERY_PROCESSING_TIME = Histogram("query_processing_seconds", "Time spent processing a query", ["agent_name"])
 
 class Agent:
     def __init__(self, name: str, prompt: str, tools: list = None):
@@ -29,22 +34,24 @@ class AgentOrchestrator:
         self.tools[tool_name] = tool_function
 
     def process_query(self, index_name: str, query: str, agent_name: str):
-        if agent_name not in self.agents:
-            raise ValueError(f"Agent '{agent_name}' not found.")
+        with QUERY_PROCESSING_TIME.labels(agent_name=agent_name).time():
+            if agent_name not in self.agents:
+                raise ValueError(f"Agent '{agent_name}' not found.")
 
-        agent = self.agents[agent_name]
-        embedding_model = self._get_embedding_model()
-        query_embedding = embedding_model.encode(query)
-        search_results = self.vector_db_client.search(index_name, query_embedding)
+            agent = self.agents[agent_name]
+            embedding_model = self._get_embedding_model()
+            query_embedding = embedding_model.encode(query)
+            search_results = self.vector_db_client.search(index_name, query_embedding)
 
-        context = "\n".join([result['document'] for result in search_results])
+            context = "\n".join([result['document'] for result in search_results])
 
-        prompt = agent.prompt.format(context=context, query=query)
+            prompt = agent.prompt.format(context=context, query=query)
 
-        response = openai.Completion.create(
-            engine="text-davinci-003",
-            prompt=prompt,
-            max_tokens=150
-        )
+            response = openai.Completion.create(
+                engine="text-davinci-003",
+                prompt=prompt,
+                max_tokens=150
+            )
 
-        return response.choices[0].text.strip()
+            QUERIES_PROCESSED.labels(agent_name=agent_name).inc()
+            return response.choices[0].text.strip()

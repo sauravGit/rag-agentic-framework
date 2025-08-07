@@ -7,3 +7,4 @@ openai
 click
 pytest
 elasticsearch
+prometheus-client
